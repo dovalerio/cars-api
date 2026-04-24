@@ -31,6 +31,14 @@ spring:
     problemdetails:
       enabled: ${MVC_PROBLEM_DETAILS_ENABLED}
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /api-docs
+    disable-swagger-default-url: true
+
 logging:
   level:
     root: ${LOG_LEVEL_ROOT}
@@ -39,8 +47,8 @@ logging:
 
 security:
   jwt:
-    secret: ${JWT_SECRET}
-    expiration: ${JWT_EXPIRATION}
+    secret: ${JWT_SECRET:cars-api-super-secret-key-with-at-least-32-characters-123456}
+    expiration-minutes: 60
 
 app:
   currency:

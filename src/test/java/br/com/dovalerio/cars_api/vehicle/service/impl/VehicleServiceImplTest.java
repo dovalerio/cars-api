@@ -5,6 +5,9 @@ import br.com.dovalerio.cars_api.common.exception.NotFoundException;
 import br.com.dovalerio.cars_api.exchange.proxy.ExchangeRateProxy;
 import br.com.dovalerio.cars_api.vehicle.Vehicle;
 import br.com.dovalerio.cars_api.vehicle.dto.request.CreateVehicleRequest;
+import br.com.dovalerio.cars_api.vehicle.dto.request.PatchVehicleRequest;
+import br.com.dovalerio.cars_api.vehicle.dto.request.UpdateVehicleRequest;
+import br.com.dovalerio.cars_api.vehicle.dto.response.VehicleBrandReport;
 import br.com.dovalerio.cars_api.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,10 +15,7 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -33,36 +33,58 @@ class VehicleServiceImplTest {
     private VehicleRepository repository;
 
     @Mock
-    private ExchangeRateProxy proxy;
+    private ExchangeRateProxy exchangeProxy;
 
     @InjectMocks
     private VehicleServiceImpl service;
 
-    private CreateVehicleRequest buildRequest() {
-        CreateVehicleRequest r = new CreateVehicleRequest();
-        r.setBrand("Toyota");
-        r.setModel("Corolla");
-        r.setYear(2022);
-        r.setColor("Black");
-        r.setPlate("ABC1234");
-        r.setPriceBrl(new BigDecimal("100000"));
-        return r;
+    private CreateVehicleRequest createRequest() {
+        return new CreateVehicleRequest(
+                "Toyota",
+                "Corolla",
+                2022,
+                "Black",
+                "ABC1234",
+                new BigDecimal("100000")
+        );
+    }
+
+    private UpdateVehicleRequest updateRequest() {
+        return new UpdateVehicleRequest(
+                "Honda",
+                "Civic",
+                2023,
+                "White",
+                "XYZ9876",
+                new BigDecimal("120000")
+        );
+    }
+
+    private Vehicle vehicle() {
+        return Vehicle.create(
+                "Toyota",
+                "Corolla",
+                2022,
+                "Black",
+                "ABC1234",
+                new BigDecimal("20000.00")
+        );
     }
 
     @Test
     void shouldCreateVehicleSuccessfully() {
+        CreateVehicleRequest request = createRequest();
 
-        CreateVehicleRequest req = buildRequest();
+        when(repository.existsByPlate(request.plate())).thenReturn(false);
+        when(exchangeProxy.getUsdToBrlRate()).thenReturn(new BigDecimal("5.0"));
+        when(repository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        when(repository.existsByPlate(req.getPlate())).thenReturn(false);
-        when(proxy.getUsdToBrlRate()).thenReturn(new BigDecimal("5.0"));
-        when(repository.save(any(Vehicle.class))).thenAnswer(i -> i.getArgument(0));
-
-        Vehicle result = service.create(req);
+        Vehicle result = service.create(request);
 
         assertNotNull(result);
         assertEquals("Toyota", result.getBrand());
         assertEquals("Corolla", result.getModel());
+        assertEquals(2022, result.getYear());
         assertEquals("Black", result.getColor());
         assertEquals("ABC1234", result.getPlate());
         assertEquals(new BigDecimal("20000.00"), result.getPriceUsd());
@@ -71,103 +93,65 @@ class VehicleServiceImplTest {
     }
 
     @Test
-    void shouldThrowWhenPlateAlreadyExists() {
+    void shouldThrowWhenPlateAlreadyExistsOnCreate() {
+        CreateVehicleRequest request = createRequest();
 
-        CreateVehicleRequest req = buildRequest();
+        when(repository.existsByPlate(request.plate())).thenReturn(true);
 
-        when(repository.existsByPlate(req.getPlate())).thenReturn(true);
-
-        assertThrows(BusinessException.class,
-                () -> service.create(req));
+        assertThrows(BusinessException.class, () -> service.create(request));
 
         verify(repository, never()).save(any());
-        verify(proxy, never()).getUsdToBrlRate();
+        verify(exchangeProxy, never()).getUsdToBrlRate();
     }
 
     @Test
-    void shouldCalculateUsdCorrectly() {
+    void shouldPropagateExchangeExceptionOnCreate() {
+        CreateVehicleRequest request = createRequest();
 
-        CreateVehicleRequest req = buildRequest();
+        when(repository.existsByPlate(request.plate())).thenReturn(false);
+        when(exchangeProxy.getUsdToBrlRate()).thenThrow(new RuntimeException("Exchange error"));
 
-        when(repository.existsByPlate(req.getPlate())).thenReturn(false);
-        when(proxy.getUsdToBrlRate()).thenReturn(new BigDecimal("4.0"));
-        when(repository.save(any(Vehicle.class))).thenAnswer(i -> i.getArgument(0));
-
-        Vehicle result = service.create(req);
-
-        assertEquals(new BigDecimal("25000.00"), result.getPriceUsd());
-    }
-
-    @Test
-    void shouldPropagateExchangeException() {
-
-        CreateVehicleRequest req = buildRequest();
-
-        when(repository.existsByPlate(req.getPlate())).thenReturn(false);
-        when(proxy.getUsdToBrlRate()).thenThrow(new RuntimeException());
-
-        assertThrows(RuntimeException.class,
-                () -> service.create(req));
+        assertThrows(RuntimeException.class, () -> service.create(request));
 
         verify(repository, never()).save(any());
     }
 
     @Test
     void shouldReturnVehicleWhenActive() {
-
         UUID id = UUID.randomUUID();
-
-        Vehicle vehicle = Vehicle.builder()
-                .id(id)
-                .brand("Toyota")
-                .active(true)
-                .build();
+        Vehicle vehicle = vehicle();
 
         when(repository.findById(id)).thenReturn(Optional.of(vehicle));
 
         Vehicle result = service.findById(id);
 
-        assertEquals(id, result.getId());
+        assertSame(vehicle, result);
     }
 
     @Test
     void shouldThrowWhenVehicleNotFound() {
-
         UUID id = UUID.randomUUID();
 
         when(repository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class,
-                () -> service.findById(id));
+        assertThrows(NotFoundException.class, () -> service.findById(id));
     }
 
     @Test
     void shouldThrowWhenVehicleInactive() {
-
         UUID id = UUID.randomUUID();
-
-        Vehicle vehicle = Vehicle.builder()
-                .id(id)
-                .active(false)
-                .build();
+        Vehicle vehicle = vehicle();
+        vehicle.deactivate();
 
         when(repository.findById(id)).thenReturn(Optional.of(vehicle));
 
-        assertThrows(NotFoundException.class,
-                () -> service.findById(id));
+        assertThrows(NotFoundException.class, () -> service.findById(id));
     }
 
     @Test
     void shouldReturnPagedResult() {
-
         Pageable pageable = PageRequest.of(0, 10);
-
-        Vehicle v = Vehicle.builder()
-                .brand("Toyota")
-                .active(true)
-                .build();
-
-        Page<Vehicle> page = new PageImpl<>(List.of(v));
+        Page<Vehicle> page = new PageImpl<>(List.of(vehicle()));
 
         when(repository.findAll(
                 ArgumentMatchers.<Specification<Vehicle>>any(),
@@ -188,7 +172,6 @@ class VehicleServiceImplTest {
 
     @Test
     void shouldReturnEmptyPageWhenNoResults() {
-
         Pageable pageable = PageRequest.of(0, 10);
 
         when(repository.findAll(
@@ -197,27 +180,165 @@ class VehicleServiceImplTest {
         )).thenReturn(Page.empty());
 
         Page<Vehicle> result = service.findAll(
-                null, null, null, null, null, pageable
+                null,
+                null,
+                null,
+                null,
+                null,
+                pageable
         );
 
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void shouldCallRepositoryWithSpecification() {
+    void shouldUpdateVehicleSuccessfully() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = vehicle();
+        UpdateVehicleRequest request = updateRequest();
 
-        Pageable pageable = PageRequest.of(0, 10);
+        when(repository.findById(id)).thenReturn(Optional.of(vehicle));
+        when(repository.existsByPlate(request.plate())).thenReturn(false);
+        when(exchangeProxy.getUsdToBrlRate()).thenReturn(new BigDecimal("6.0"));
+        when(repository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        when(repository.findAll(
-                ArgumentMatchers.<Specification<Vehicle>>any(),
-                eq(pageable)
-        )).thenReturn(Page.empty());
+        Vehicle result = service.update(id, request);
 
-        service.findAll(null, null, null, null, null, pageable);
+        assertEquals("Honda", result.getBrand());
+        assertEquals("Civic", result.getModel());
+        assertEquals(2023, result.getYear());
+        assertEquals("White", result.getColor());
+        assertEquals("XYZ9876", result.getPlate());
+        assertEquals(new BigDecimal("20000.00"), result.getPriceUsd());
 
-        verify(repository).findAll(
-                ArgumentMatchers.<Specification<Vehicle>>any(),
-                eq(pageable)
+        verify(repository).save(vehicle);
+    }
+
+    @Test
+    void shouldUpdateVehicleWithoutValidatingPlateWhenPlateIsSame() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = vehicle();
+
+        UpdateVehicleRequest request = new UpdateVehicleRequest(
+                "Toyota",
+                "Corolla XEI",
+                2024,
+                "Silver",
+                "ABC1234",
+                new BigDecimal("150000")
         );
+
+        when(repository.findById(id)).thenReturn(Optional.of(vehicle));
+        when(exchangeProxy.getUsdToBrlRate()).thenReturn(new BigDecimal("5.0"));
+        when(repository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Vehicle result = service.update(id, request);
+
+        assertEquals("Corolla XEI", result.getModel());
+        assertEquals(new BigDecimal("30000.00"), result.getPriceUsd());
+
+        verify(repository, never()).existsByPlate(request.plate());
+        verify(repository).save(vehicle);
+    }
+
+    @Test
+    void shouldThrowWhenUpdatePlateAlreadyExists() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = vehicle();
+        UpdateVehicleRequest request = updateRequest();
+
+        when(repository.findById(id)).thenReturn(Optional.of(vehicle));
+        when(repository.existsByPlate(request.plate())).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> service.update(id, request));
+
+        verify(repository, never()).save(any());
+        verify(exchangeProxy, never()).getUsdToBrlRate();
+    }
+
+    @Test
+    void shouldPatchVehicleSuccessfully() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = vehicle();
+
+        PatchVehicleRequest request = new PatchVehicleRequest(
+                "Honda",
+                null,
+                null,
+                "White",
+                new BigDecimal("100000")
+        );
+
+        when(repository.findById(id)).thenReturn(Optional.of(vehicle));
+        when(exchangeProxy.getUsdToBrlRate()).thenReturn(new BigDecimal("5.0"));
+        when(repository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Vehicle result = service.patch(id, request);
+
+        assertEquals("Honda", result.getBrand());
+        assertEquals("Corolla", result.getModel());
+        assertEquals(2022, result.getYear());
+        assertEquals("White", result.getColor());
+        assertEquals("ABC1234", result.getPlate());
+        assertEquals(new BigDecimal("20000.00"), result.getPriceUsd());
+
+        verify(repository).save(vehicle);
+    }
+
+    @Test
+    void shouldPatchVehicleWithoutChangingPriceWhenPriceIsNull() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = vehicle();
+
+        PatchVehicleRequest request = new PatchVehicleRequest(
+                null,
+                "Corolla Altis",
+                null,
+                null,
+                null
+        );
+
+        when(repository.findById(id)).thenReturn(Optional.of(vehicle));
+        when(repository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Vehicle result = service.patch(id, request);
+
+        assertEquals("Toyota", result.getBrand());
+        assertEquals("Corolla Altis", result.getModel());
+        assertEquals(new BigDecimal("20000.00"), result.getPriceUsd());
+
+        verify(exchangeProxy, never()).getUsdToBrlRate();
+        verify(repository).save(vehicle);
+    }
+
+    @Test
+    void shouldDeleteVehicleUsingSoftDelete() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = vehicle();
+
+        when(repository.findById(id)).thenReturn(Optional.of(vehicle));
+
+        service.delete(id);
+
+        assertFalse(vehicle.isActive());
+        verify(repository).save(vehicle);
+    }
+
+    @Test
+    void shouldReturnReportByBrand() {
+        List<VehicleBrandReport> report = List.of(
+                new VehicleBrandReport("Toyota", 2L),
+                new VehicleBrandReport("Honda", 1L)
+        );
+
+        when(repository.countByBrand()).thenReturn(report);
+
+        List<VehicleBrandReport> result = service.reportByBrand();
+
+        assertEquals(2, result.size());
+        assertEquals("Toyota", result.getFirst().brand());
+        assertEquals(2L, result.getFirst().total());
+
+        verify(repository).countByBrand();
     }
 }

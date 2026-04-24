@@ -1,8 +1,12 @@
 package br.com.dovalerio.cars_api.common.exception;
 
 import br.com.dovalerio.cars_api.common.response.ErrorResponse;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -44,6 +48,39 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDb() {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(
+            BadCredentialsException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(HttpStatus.UNAUTHORIZED, "Invalid credentials", request);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(
+            UsernameNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(HttpStatus.UNAUTHORIZED, "Invalid credentials", request);
+    }
+
+    @ExceptionHandler(JwtException.class)
+    public ResponseEntity<ErrorResponse> handleJwt(
+            JwtException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            AccessDeniedException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(HttpStatus.FORBIDDEN, "Access denied", request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(
             Exception ex,

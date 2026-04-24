@@ -4,15 +4,15 @@ services:
     container_name: cars-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: carsdb
-      POSTGRES_USER: carsuser
-      POSTGRES_PASSWORD: carspass
+      POSTGRES_DB: ${DB_NAME:-carsdb}
+      POSTGRES_USER: ${DB_USER:-carsuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-carspass}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U carsuser -d carsdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-carsuser} -d ${DB_NAME:-carsdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,8 +22,16 @@ services:
     container_name: cars-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
+  redis_data:

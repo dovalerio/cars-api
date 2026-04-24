@@ -1,0 +1,300 @@
+openapi: 3.0.3
+info:
+  title: Cars API
+  version: 1.0.0
+  description: API para gerenciamento de veículos com autenticação JWT
+
+servers:
+  - url: http://localhost:8080
+
+tags:
+  - name: Auth
+  - name: Vehicles
+
+paths:
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Autenticação de usuário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: Token JWT gerado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Credenciais inválidas
+
+  /veiculos:
+    get:
+      tags:
+        - Vehicles
+      summary: Lista veículos com filtros
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: marca
+          in: query
+          schema:
+            type: string
+        - name: ano
+          in: query
+          schema:
+            type: integer
+        - name: cor
+          in: query
+          schema:
+            type: string
+        - name: minPreco
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: maxPreco
+          in: query
+          schema:
+            type: number
+            format: double
+      responses:
+        '200':
+          description: Lista paginada de veículos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageVehicleResponse'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+
+    post:
+      tags:
+        - Vehicles
+      summary: Cria veículo (ADMIN)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVehicleRequest'
+      responses:
+        '201':
+          description: Veículo criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleResponse'
+        '400':
+          description: Dados inválidos
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+
+  /veiculos/{id}:
+    get:
+      tags:
+        - Vehicles
+      summary: Busca veículo por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Veículo encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleResponse'
+        '404':
+          description: Não encontrado
+
+    put:
+      tags:
+        - Vehicles
+      summary: Atualiza veículo (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateVehicleRequest'
+      responses:
+        '200':
+          description: Atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleResponse'
+
+    patch:
+      tags:
+        - Vehicles
+      summary: Atualização parcial (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchVehicleRequest'
+      responses:
+        '200':
+          description: Atualizado parcialmente
+
+    delete:
+      tags:
+        - Vehicles
+      summary: Remove veículo (soft delete - ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Removido com sucesso
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    AuthRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+
+    CreateVehicleRequest:
+      type: object
+      required:
+        - brand
+        - model
+        - year
+        - color
+        - plate
+        - priceBrl
+      properties:
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+        plate:
+          type: string
+        priceBrl:
+          type: number
+          format: double
+
+    UpdateVehicleRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateVehicleRequest'
+
+    PatchVehicleRequest:
+      type: object
+      properties:
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+        priceBrl:
+          type: number
+          format: double
+
+    VehicleResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+        plate:
+          type: string
+        priceUsd:
+          type: number
+          format: double
+
+    PageVehicleResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/VehicleResponse'
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        size:
+          type: integer
+        number:
+          type: integer

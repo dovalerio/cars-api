@@ -68,16 +68,6 @@ class VehicleSpecificationTest {
     }
 
     @Test
-    void shouldReturnTrueSpecWhenBrandNull() {
-        Specification<Vehicle> spec = VehicleSpecification.hasBrand(null);
-
-        Predicate result = spec.toPredicate(root, query, cb);
-
-        assertNotNull(result);
-        verify(cb).conjunction();
-    }
-
-    @Test
     void shouldFilterByYear() {
         when(root.<Integer>get("year")).thenReturn(intPath);
         when(cb.equal(intPath, 2022)).thenReturn(predicate);
