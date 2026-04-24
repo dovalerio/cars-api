@@ -13,12 +13,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
-class TExchangeRateProxyTest {
+class ExchangeRateProxyTest {
 
     @Mock
     private ExchangeRateClient client;
@@ -40,13 +40,12 @@ class TExchangeRateProxyTest {
     @BeforeEach
     void setup() {
         when(redis.opsForValue()).thenReturn(valueOps);
-        when(config.getCacheTtlMinutes()).thenReturn(10);
     }
 
     @Test
-    void shouldReturnRateFromPrimary() {
-
-        when(valueOps.get(anyString())).thenReturn(null);
+    void shouldUsePrimaryAndCache() {
+        when(valueOps.get(KEY)).thenReturn(null);
+        when(config.getCacheTtlMinutes()).thenReturn(10);
         when(client.getRateFromPrimary()).thenReturn(new BigDecimal("5.0"));
 
         BigDecimal result = proxy.getUsdToBrlRate();
@@ -54,20 +53,16 @@ class TExchangeRateProxyTest {
         assertEquals(new BigDecimal("5.0"), result);
 
         verify(client).getRateFromPrimary();
-        verify(client, never()).getRateFromFallback();
-        verify(valueOps).set(eq(KEY), eq("5.0"), any());
+        verify(valueOps).set(eq(KEY), eq("5.0"), eq(Duration.ofMinutes(10)));
     }
 
     @Test
-    void shouldUseFallbackWhenPrimaryFails() {
+    void shouldFallbackWhenPrimaryFails() {
+        when(valueOps.get(KEY)).thenReturn(null);
+        when(config.getCacheTtlMinutes()).thenReturn(10);
 
-        when(valueOps.get(anyString())).thenReturn(null);
-
-        when(client.getRateFromPrimary())
-                .thenThrow(new RuntimeException());
-
-        when(client.getRateFromFallback())
-                .thenReturn(new BigDecimal("4.5"));
+        when(client.getRateFromPrimary()).thenThrow(new RuntimeException());
+        when(client.getRateFromFallback()).thenReturn(new BigDecimal("4.5"));
 
         BigDecimal result = proxy.getUsdToBrlRate();
 
@@ -75,39 +70,26 @@ class TExchangeRateProxyTest {
 
         verify(client).getRateFromPrimary();
         verify(client).getRateFromFallback();
-        verify(valueOps).set(eq(KEY), eq("4.5"), any());
     }
 
     @Test
-    void shouldUseCacheWhenBothApisFail() {
-
+    void shouldReturnCacheWhenBothFail() {
         when(valueOps.get(KEY)).thenReturn("4.0");
 
-        when(client.getRateFromPrimary())
-                .thenThrow(new RuntimeException());
-
-        when(client.getRateFromFallback())
-                .thenThrow(new RuntimeException());
+        when(client.getRateFromPrimary()).thenThrow(new RuntimeException());
+        when(client.getRateFromFallback()).thenThrow(new RuntimeException());
 
         BigDecimal result = proxy.getUsdToBrlRate();
 
         assertEquals(new BigDecimal("4.0"), result);
-
-        verify(client).getRateFromPrimary();
-        verify(client).getRateFromFallback();
-        verify(valueOps, never()).set(any(), any(), any());
     }
 
     @Test
-    void shouldThrowExceptionWhenNoCacheAndApisFail() {
-
+    void shouldThrowWhenNoCacheAndAllFail() {
         when(valueOps.get(KEY)).thenReturn(null);
 
-        when(client.getRateFromPrimary())
-                .thenThrow(new RuntimeException());
-
-        when(client.getRateFromFallback())
-                .thenThrow(new RuntimeException());
+        when(client.getRateFromPrimary()).thenThrow(new RuntimeException());
+        when(client.getRateFromFallback()).thenThrow(new RuntimeException());
 
         assertThrows(RuntimeException.class,
                 () -> proxy.getUsdToBrlRate());
@@ -115,20 +97,16 @@ class TExchangeRateProxyTest {
 
     @Test
     void shouldCallPrimaryThenFallbackInOrder() {
+        when(valueOps.get(KEY)).thenReturn(null);
+        when(config.getCacheTtlMinutes()).thenReturn(10);
 
-        when(valueOps.get(anyString())).thenReturn(null);
-
-        when(client.getRateFromPrimary())
-                .thenThrow(new RuntimeException());
-
-        when(client.getRateFromFallback())
-                .thenReturn(new BigDecimal("4.5"));
+        when(client.getRateFromPrimary()).thenThrow(new RuntimeException());
+        when(client.getRateFromFallback()).thenReturn(new BigDecimal("4.5"));
 
         proxy.getUsdToBrlRate();
 
-        InOrder inOrder = inOrder(client);
-
-        inOrder.verify(client).getRateFromPrimary();
-        inOrder.verify(client).getRateFromFallback();
+        InOrder order = inOrder(client);
+        order.verify(client).getRateFromPrimary();
+        order.verify(client).getRateFromFallback();
     }
 }

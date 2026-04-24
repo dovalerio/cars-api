@@ -1,53 +1,50 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT}
 
 spring:
   application:
-    name: cars-api
+    name: ${SPRING_APP_NAME}
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/carsdb
-    username: carsuser
-    password: carspass
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
-    open-in-view: false
-    show-sql: false
+      ddl-auto: ${JPA_DDL_AUTO}
+    open-in-view: ${JPA_OPEN_IN_VIEW}
+    show-sql: ${JPA_SHOW_SQL}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${JPA_FORMAT_SQL}
 
   data:
     redis:
-      host: localhost
-      port: 6379
-      timeout: 2000
-
-#  jackson:
-#    serialization:
-      #WRITE_DATES_AS_TIMESTAMPS: false
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      timeout: ${REDIS_TIMEOUT}
 
   mvc:
     problemdetails:
-      enabled: false
+      enabled: ${MVC_PROBLEM_DETAILS_ENABLED}
 
 logging:
   level:
-    root: INFO
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
+    root: ${LOG_LEVEL_ROOT}
+    org.springframework.security: ${LOG_LEVEL_SECURITY}
+    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE_SQL}
 
 security:
   jwt:
-    secret: ${JWT_SECRET:change-this-secret}
-    expiration: 3600000
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION}
 
 app:
   currency:
-    cache-ttl-minutes: 10
+    cache-ttl-minutes: ${CURRENCY_CACHE_TTL}
     endpoints:
-      primary: https://economia.awesomeapi.com.br/json/last/USD-BRL
-      fallback: https://api.frankfurter.app/latest?from=USD&to=BRL
+      primary: ${CURRENCY_API_PRIMARY}
+      fallback: ${CURRENCY_API_FALLBACK}

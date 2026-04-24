@@ -9,43 +9,40 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "vehicles", uniqueConstraints = {
         @UniqueConstraint(columnNames = "plate")
 })
-
-@Getter
 public class Vehicle {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Setter
     private String brand;
-    @Setter
     private String model;
-    @Setter
     private Integer year;
-    @Setter
     private String color;
 
     @Column(nullable = false, unique = true)
-    @Setter
     private String plate;
 
-    @Setter
     private BigDecimal priceUsd;
 
-    @Setter
-    private Boolean active = true;
+    private Boolean active;
 
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

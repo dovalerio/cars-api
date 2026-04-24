@@ -1,6 +1,7 @@
 package br.com.dovalerio.cars_api.exchange.client;
 
 import br.com.dovalerio.cars_api.config.CurrencyConfig;
+import br.com.dovalerio.cars_api.exchange.client.impl.ExchangeRateClientImpl;
 import br.com.dovalerio.cars_api.exchange.dto.AwesomeApiResponse;
 import br.com.dovalerio.cars_api.exchange.dto.FrankfurterResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +14,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ExchangeRateClientTest {
@@ -26,7 +28,7 @@ class ExchangeRateClientTest {
     private CurrencyConfig config;
 
     @InjectMocks
-    private ExchangeRateClient client;
+    private ExchangeRateClientImpl client;
 
     @BeforeEach
     void setup() {
@@ -38,15 +40,14 @@ class ExchangeRateClientTest {
     }
 
     @Test
-    void shouldReturnRateFromPrimary() {
-
-        AwesomeApiResponse response = new AwesomeApiResponse();
+    void shouldReturnPrimaryRate() {
+        AwesomeApiResponse resp = new AwesomeApiResponse();
         AwesomeApiResponse.UsdBrl usd = new AwesomeApiResponse.UsdBrl();
         usd.setBid("5.0");
-        response.setUsdbrl(usd);
+        resp.setUsdbrl(usd);
 
         when(httpClient.get("primary-url", AwesomeApiResponse.class))
-                .thenReturn(response);
+                .thenReturn(resp);
 
         BigDecimal result = client.getRateFromPrimary();
 
@@ -54,8 +55,7 @@ class ExchangeRateClientTest {
     }
 
     @Test
-    void shouldThrowExceptionWhenPrimaryInvalid() {
-
+    void shouldThrowWhenPrimaryInvalid() {
         when(httpClient.get("primary-url", AwesomeApiResponse.class))
                 .thenReturn(new AwesomeApiResponse());
 
@@ -64,13 +64,12 @@ class ExchangeRateClientTest {
     }
 
     @Test
-    void shouldReturnRateFromFallback() {
-
-        FrankfurterResponse response = new FrankfurterResponse();
-        response.setRates(Map.of("BRL", new BigDecimal("5.2")));
+    void shouldReturnFallbackRate() {
+        FrankfurterResponse resp = new FrankfurterResponse();
+        resp.setRates(Map.of("BRL", new BigDecimal("5.2")));
 
         when(httpClient.get("fallback-url", FrankfurterResponse.class))
-                .thenReturn(response);
+                .thenReturn(resp);
 
         BigDecimal result = client.getRateFromFallback();
 
@@ -78,8 +77,7 @@ class ExchangeRateClientTest {
     }
 
     @Test
-    void shouldThrowExceptionWhenFallbackInvalid() {
-
+    void shouldThrowWhenFallbackInvalid() {
         when(httpClient.get("fallback-url", FrankfurterResponse.class))
                 .thenReturn(new FrankfurterResponse());
 

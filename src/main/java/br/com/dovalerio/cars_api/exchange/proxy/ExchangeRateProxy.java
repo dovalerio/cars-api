@@ -2,7 +2,8 @@ package br.com.dovalerio.cars_api.exchange.proxy;
 
 import br.com.dovalerio.cars_api.config.CurrencyConfig;
 import br.com.dovalerio.cars_api.exchange.client.ExchangeRateClient;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.com.dovalerio.cars_api.exchange.exception.CurrencyServiceException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -10,31 +11,25 @@ import java.math.BigDecimal;
 import java.time.Duration;
 
 @Component
+@RequiredArgsConstructor
 public class ExchangeRateProxy {
 
     private static final String KEY = "usd_brl_rate";
 
-    @Autowired
-    private ExchangeRateClient client;
-
-    @Autowired
-    private StringRedisTemplate redis;
-
-    @Autowired
-    private CurrencyConfig config;
+    private final ExchangeRateClient client;
+    private final StringRedisTemplate redis;
+    private final CurrencyConfig config;
 
     public BigDecimal getUsdToBrlRate() {
 
-        String cached = redis.opsForValue().get(KEY);
+        var ops = redis.opsForValue();
+        String cached = ops.get(KEY);
 
         try {
             BigDecimal rate = client.getRateFromPrimary();
 
-            redis.opsForValue().set(
-                    KEY,
-                    rate.toString(),
-                    Duration.ofMinutes(config.getCacheTtlMinutes())
-            );
+            ops.set(KEY, rate.toString(),
+                    Duration.ofMinutes(config.getCacheTtlMinutes()));
 
             return rate;
 
@@ -43,11 +38,8 @@ public class ExchangeRateProxy {
             try {
                 BigDecimal rate = client.getRateFromFallback();
 
-                redis.opsForValue().set(
-                        KEY,
-                        rate.toString(),
-                        Duration.ofMinutes(config.getCacheTtlMinutes())
-                );
+                ops.set(KEY, rate.toString(),
+                        Duration.ofMinutes(config.getCacheTtlMinutes()));
 
                 return rate;
 
@@ -57,7 +49,7 @@ public class ExchangeRateProxy {
                     return new BigDecimal(cached);
                 }
 
-                throw new RuntimeException("Currency service unavailable");
+                throw new CurrencyServiceException("Currency service unavailable");
             }
         }
     }

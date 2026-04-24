@@ -4,12 +4,13 @@ import br.com.dovalerio.cars_api.common.exception.BusinessException;
 import br.com.dovalerio.cars_api.common.exception.NotFoundException;
 
 import br.com.dovalerio.cars_api.exchange.proxy.ExchangeRateProxy;
+
 import br.com.dovalerio.cars_api.vehicle.Vehicle;
 import br.com.dovalerio.cars_api.vehicle.dto.request.CreateVehicleRequest;
 import br.com.dovalerio.cars_api.vehicle.repository.VehicleRepository;
 import br.com.dovalerio.cars_api.vehicle.service.VehicleService;
 import br.com.dovalerio.cars_api.vehicle.specification.VehicleSpecification;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -20,35 +21,22 @@ import java.math.RoundingMode;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class VehicleServiceImpl implements VehicleService {
 
-    @Autowired
-    private VehicleRepository repository;
-    @Autowired
-    private ExchangeRateProxy exchangeProxy;
+    private final VehicleRepository repository;
+    private final ExchangeRateProxy exchangeProxy;
 
     @Override
     public Vehicle create(CreateVehicleRequest request) {
 
-        if (repository.existsByPlate(request.getPlate())) {
-            throw new BusinessException("Plate already exists");
-        }
+        validatePlate(request.getPlate());
 
-        Vehicle vehicle = new Vehicle();
         BigDecimal rate = exchangeProxy.getUsdToBrlRate();
 
-        BigDecimal priceUsd = request.getPriceBrl()
-                .divide(rate, 2, RoundingMode.HALF_UP);
+        BigDecimal priceUsd = convertToUsd(request.getPriceBrl(), rate);
 
-        vehicle.setPriceUsd(priceUsd);
-
-
-        vehicle.setBrand(request.getBrand());
-        vehicle.setModel(request.getModel());
-        vehicle.setYear(request.getYear());
-        vehicle.setColor(request.getColor());
-        vehicle.setPlate(request.getPlate());
-
+        Vehicle vehicle = buildVehicle(request, priceUsd);
 
         return repository.save(vehicle);
     }
@@ -73,5 +61,26 @@ public class VehicleServiceImpl implements VehicleService {
         return repository.findById(id)
                 .filter(Vehicle::getActive)
                 .orElseThrow(() -> new NotFoundException("Vehicle not found"));
+    }
+
+    private void validatePlate(String plate) {
+        if (repository.existsByPlate(plate)) {
+            throw new BusinessException("Plate already exists");
+        }
+    }
+
+    private BigDecimal convertToUsd(BigDecimal priceBrl, BigDecimal rate) {
+        return priceBrl.divide(rate, 2, RoundingMode.HALF_UP);
+    }
+
+    private Vehicle buildVehicle(CreateVehicleRequest request, BigDecimal priceUsd) {
+        return Vehicle.builder()
+                .brand(request.getBrand())
+                .model(request.getModel())
+                .year(request.getYear())
+                .color(request.getColor())
+                .plate(request.getPlate())
+                .priceUsd(priceUsd)
+                .build();
     }
 }
