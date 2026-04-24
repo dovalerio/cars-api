@@ -81,6 +81,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public Vehicle update(UUID id, UpdateVehicleRequest request) {
+        validateUpdateRequest(request);
 
         Vehicle vehicle = findById(id);
 
@@ -102,6 +103,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public Vehicle patch(UUID id, PatchVehicleRequest request) {
+        validatePatchRequest(request);
 
         Vehicle vehicle = findById(id);
 
@@ -142,5 +144,32 @@ public class VehicleServiceImpl implements VehicleService {
     private BigDecimal convertToUsd(BigDecimal priceBrl) {
         BigDecimal rate = exchangeProxy.getUsdToBrlRate();
         return priceBrl.divide(rate, 2, RoundingMode.HALF_UP);
+    }
+
+    private void validateUpdateRequest(UpdateVehicleRequest request) {
+        if (isBlank(request.brand())
+                || isBlank(request.model())
+                || request.year() == null
+                || request.year() < 1900
+                || isBlank(request.color())
+                || isBlank(request.plate())
+                || request.priceBrl() == null
+                || request.priceBrl().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Invalid vehicle data for update");
+        }
+    }
+
+    private void validatePatchRequest(PatchVehicleRequest request) {
+        if (request.year() != null && request.year() < 1900) {
+            throw new BusinessException("Year must be valid");
+        }
+
+        if (request.priceBrl() != null && request.priceBrl().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Price must be positive");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

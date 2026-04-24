@@ -79,7 +79,7 @@ public class VehicleController {
     @PatchMapping("/{id}")
     public ResponseEntity<VehicleResponse> patch(
             @PathVariable UUID id,
-            @RequestBody PatchVehicleRequest request
+            @Valid @RequestBody PatchVehicleRequest request
     ) {
         Vehicle updated = service.patch(id, request);
         return ResponseEntity.ok(VehicleMapper.toResponse(updated));

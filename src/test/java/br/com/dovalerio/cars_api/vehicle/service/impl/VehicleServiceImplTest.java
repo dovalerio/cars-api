@@ -257,6 +257,25 @@ class VehicleServiceImplTest {
     }
 
     @Test
+    void shouldThrowWhenUpdateRequestIsInvalid() {
+        UUID id = UUID.randomUUID();
+
+        UpdateVehicleRequest invalidRequest = new UpdateVehicleRequest(
+                "",
+                "Civic",
+                2023,
+                "White",
+                "XYZ9876",
+                new BigDecimal("120000")
+        );
+
+        assertThrows(BusinessException.class, () -> service.update(id, invalidRequest));
+
+        verify(repository, never()).save(any());
+        verify(exchangeProxy, never()).getUsdToBrlRate();
+    }
+
+    @Test
     void shouldPatchVehicleSuccessfully() {
         UUID id = UUID.randomUUID();
         Vehicle vehicle = vehicle();
@@ -309,6 +328,25 @@ class VehicleServiceImplTest {
 
         verify(exchangeProxy, never()).getUsdToBrlRate();
         verify(repository).save(vehicle);
+    }
+
+    @Test
+    void shouldThrowWhenPatchRequestHasInvalidPrice() {
+        UUID id = UUID.randomUUID();
+
+        PatchVehicleRequest invalidRequest = new PatchVehicleRequest(
+                null,
+                null,
+                null,
+                null,
+                new BigDecimal("0")
+        );
+
+        assertThrows(BusinessException.class, () -> service.patch(id, invalidRequest));
+
+        verify(repository, never()).findById(any());
+        verify(repository, never()).save(any());
+        verify(exchangeProxy, never()).getUsdToBrlRate();
     }
 
     @Test
