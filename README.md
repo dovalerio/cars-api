@@ -1,4 +1,9 @@
 # Cars API
+
+![CI](https://github.com/dovalerio/cars-api/actions/workflows/ci.yml/badge.svg)
+![Java](https://img.shields.io/badge/Java-21-blue)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-green)
+
 API backend em Java 21 + Spring Boot 4 para autenticação JWT e operações de veículos.
 
 ## Pré-requisitos
